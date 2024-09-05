@@ -1,0 +1,47 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main  # Set your branch name if different
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Log in to Azure Container Registry
+        run: az acr login --name medusaacr
+
+      - name: Build and push Docker image
+        run: |
+          docker build -t medusa-backend:latest .
+          docker tag medusa-backend:latest medusaacr.azurecr.io/medusa-backend:latest
+          docker push medusaacr.azurecr.io/medusa-backend:latest
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.4.0  # Set the Terraform version you need
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        run: terraform plan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
